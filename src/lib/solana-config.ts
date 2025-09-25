@@ -8,7 +8,7 @@ export const SOLANA_CONFIG = {
   
   // RPC Endpoints
   RPC_ENDPOINTS: {
-    devnet: process.env.REACT_APP_SOLANA_RPC_HOST || 'https://solana-devnet.g.alchemy.com/v2/aqcGGlkD3YbzV_epKoRtQ',
+    devnet: process.env.REACT_APP_SOLANA_RPC_HOST || 'https://api.devnet.solana.com',
     mainnet: 'https://api.mainnet-beta.solana.com',
   },
   
