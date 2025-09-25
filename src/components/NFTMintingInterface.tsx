@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Wallet, Image as ImageIcon, ExternalLink } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { SOLANA_CONFIG } from '@/lib/solana-config';
 
 interface NFTMintingInterfaceProps {
   candyMachineId?: string;
@@ -34,7 +35,7 @@ interface MintedNFT {
 }
 
 export default function NFTMintingInterface({ 
-  candyMachineId = "YOUR_CANDY_MACHINE_ID_HERE" 
+  candyMachineId = SOLANA_CONFIG.CANDY_MACHINE_ID 
 }: NFTMintingInterfaceProps) {
   const { connection } = useConnection();
   const { publicKey, wallet, signTransaction } = useWallet();

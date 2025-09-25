@@ -1,15 +1,14 @@
 // Solana NFT Minting Configuration
 export const SOLANA_CONFIG = {
   // Network configuration
-  NETWORK: 'devnet' as const,
+  NETWORK: (process.env.REACT_APP_SOLANA_NETWORK || 'devnet') as const,
   
   // Candy Machine Configuration
-  // Replace with your actual candy machine ID from Sugar CLI deployment
-  CANDY_MACHINE_ID: 'YOUR_CANDY_MACHINE_ID_HERE',
+  CANDY_MACHINE_ID: process.env.REACT_APP_CANDY_MACHINE_ID || 'DAkeJ58KaDE64QxgXxe2Kc4hCQuzYSF8oNuuWVhgQfBS',
   
-  // RPC Endpoints (you can customize these)
+  // RPC Endpoints
   RPC_ENDPOINTS: {
-    devnet: 'https://api.devnet.solana.com',
+    devnet: process.env.REACT_APP_SOLANA_RPC_HOST || 'https://solana-devnet.g.alchemy.com/v2/aqcGGlkD3YbzV_epKoRtQ',
     mainnet: 'https://api.mainnet-beta.solana.com',
   },
   
@@ -17,8 +16,6 @@ export const SOLANA_CONFIG = {
   SUPPORTED_WALLETS: [
     'Phantom',
     'Solflare', 
-    'Torus',
-    'Ledger',
   ],
   
   // UI Configuration
