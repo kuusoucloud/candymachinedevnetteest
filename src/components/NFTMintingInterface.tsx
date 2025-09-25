@@ -59,7 +59,7 @@ export default function NFTMintingInterface({
 
   // Fetch candy machine data
   const fetchCandyMachineData = useCallback(async () => {
-    if (!metaplex || !candyMachineId) return;
+    if (!connection || !candyMachineId) return;
 
     setLoading(true);
     setError(null);
@@ -72,7 +72,7 @@ export default function NFTMintingInterface({
       const candyMachineAddress = new PublicKey(candyMachineId);
       console.log('Candy machine address:', candyMachineAddress.toString());
       
-      // First, let's try to check if the account exists and get raw data
+      // Get raw account data without using Metaplex SDK
       const accountInfo = await connection.getAccountInfo(candyMachineAddress);
       console.log('Account info:', accountInfo);
       
@@ -84,24 +84,32 @@ export default function NFTMintingInterface({
       const accountOwner = accountInfo.owner.toString();
       console.log('Account owner:', accountOwner);
       console.log('Account data length:', accountInfo.data.length);
+      console.log('Account lamports:', accountInfo.lamports);
       
       // Known program IDs
       const CANDY_MACHINE_V2_PROGRAM = 'cndy3Z4yapfJBmL3ShUp5exZKqR3z33thTzeNMm2gRZ';
       const CANDY_MACHINE_CORE_PROGRAM = 'CndyV3LdqHUfDLmE5naZjVN8rBZz4tqhdefbAnjHG3JR';
       
-      // For now, let's just show what we found and create a mock candy machine data
-      console.log('Creating mock data based on account info...');
+      let candyMachineType = 'unknown';
+      if (accountOwner === CANDY_MACHINE_V2_PROGRAM) {
+        candyMachineType = 'v2';
+      } else if (accountOwner === CANDY_MACHINE_CORE_PROGRAM) {
+        candyMachineType = 'v3';
+      }
       
+      console.log('Detected candy machine type:', candyMachineType);
+      
+      // Create candy machine data based on what we know
       setCandyMachineData({
         address: candyMachineAddress,
-        itemsAvailable: 1000, // Mock data
+        itemsAvailable: 1000, // Mock data - we'll parse this properly later
         itemsMinted: 0,
         itemsRemaining: 1000,
         goLiveDate: new Date(),
         price: 0.1,
         symbol: 'TESTCO123', // From the error message we can see this
         sellerFeeBasisPoints: 500,
-        version: accountOwner === CANDY_MACHINE_CORE_PROGRAM ? 'v3' : 'v2'
+        version: candyMachineType
       });
 
       // Set a mock candy machine object for now
@@ -110,7 +118,7 @@ export default function NFTMintingInterface({
         symbol: 'TESTCO123'
       } as any);
 
-      console.log('Mock candy machine data created successfully');
+      console.log('Candy machine data created successfully with type:', candyMachineType);
       
     } catch (err: any) {
       console.error('Error fetching candy machine:', err);
@@ -126,12 +134,6 @@ export default function NFTMintingInterface({
         errorMessage = `Candy machine account not found at address: ${candyMachineId}. Please verify the candy machine ID is correct and deployed on ${SOLANA_CONFIG.NETWORK}.`;
       } else if (err.message?.includes('Invalid public key')) {
         errorMessage = 'Invalid candy machine ID format. Please check the candy machine ID.';
-      } else if (err.message?.includes('Account owner:')) {
-        errorMessage = err.message;
-      } else if (err.message?.includes('Candy Machine Core account')) {
-        errorMessage = err.message;
-      } else if (err.message?.includes('Candy Machine v2 account')) {
-        errorMessage = err.message;
       } else if (err.message?.includes('network')) {
         errorMessage = `Network error. Please check your connection to ${SOLANA_CONFIG.NETWORK}.`;
       } else {
@@ -142,7 +144,7 @@ export default function NFTMintingInterface({
     } finally {
       setLoading(false);
     }
-  }, [metaplex, candyMachineId, connection]);
+  }, [connection, candyMachineId]);
 
   useEffect(() => {
     if (metaplex) {
