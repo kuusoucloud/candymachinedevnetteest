@@ -1,7 +1,7 @@
 // Solana NFT Minting Configuration
 export const SOLANA_CONFIG = {
   // Network configuration
-  NETWORK: (process.env.REACT_APP_SOLANA_NETWORK || 'devnet') as const,
+  NETWORK: process.env.REACT_APP_SOLANA_NETWORK || 'devnet',
   
   // Candy Machine Configuration
   CANDY_MACHINE_ID: process.env.REACT_APP_CANDY_MACHINE_ID || 'DAkeJ58KaDE64QxgXxe2Kc4hCQuzYSF8oNuuWVhgQfBS',
@@ -28,7 +28,7 @@ export const SOLANA_CONFIG = {
 
 // Helper function to get RPC endpoint
 export const getRPCEndpoint = () => {
-  return SOLANA_CONFIG.RPC_ENDPOINTS[SOLANA_CONFIG.NETWORK];
+  return SOLANA_CONFIG.RPC_ENDPOINTS[SOLANA_CONFIG.NETWORK as keyof typeof SOLANA_CONFIG.RPC_ENDPOINTS];
 };
 
 // Helper function to validate candy machine ID
