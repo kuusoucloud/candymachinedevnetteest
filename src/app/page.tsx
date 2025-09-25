@@ -1,7 +1,10 @@
+import { SolanaWalletProvider } from '@/components/WalletProvider';
+import NFTMintingInterface from '@/components/NFTMintingInterface';
 
 export default function Page() {
   return (
-    <div>
-    </div>
+    <SolanaWalletProvider>
+      <NFTMintingInterface />
+    </SolanaWalletProvider>
   );
 }
