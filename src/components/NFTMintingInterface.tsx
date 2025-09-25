@@ -64,10 +64,26 @@ export default function NFTMintingInterface({
     setError(null);
 
     try {
+      console.log('Fetching candy machine with ID:', candyMachineId);
+      console.log('Network:', SOLANA_CONFIG.NETWORK);
+      console.log('RPC Endpoint:', connection.rpcEndpoint);
+      
       const candyMachineAddress = new PublicKey(candyMachineId);
+      console.log('Candy machine address:', candyMachineAddress.toString());
+      
+      // First, let's try to check if the account exists
+      const accountInfo = await connection.getAccountInfo(candyMachineAddress);
+      console.log('Account info:', accountInfo);
+      
+      if (!accountInfo) {
+        throw new Error(`Candy machine account not found at address: ${candyMachineAddress.toString()}`);
+      }
+
       const candyMachineAccount = await metaplex.candyMachinesV2().findByAddress({
         address: candyMachineAddress,
       });
+
+      console.log('Candy machine account:', candyMachineAccount);
 
       setCandyMachine(candyMachineAccount);
       
@@ -86,13 +102,31 @@ export default function NFTMintingInterface({
         symbol: candyMachineAccount.symbol,
         sellerFeeBasisPoints: candyMachineAccount.sellerFeeBasisPoints,
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching candy machine:', err);
-      setError('Failed to fetch candy machine data. Please check the candy machine ID.');
+      console.error('Error details:', {
+        message: err.message,
+        stack: err.stack,
+        name: err.name
+      });
+      
+      let errorMessage = 'Failed to fetch candy machine data.';
+      
+      if (err.message?.includes('not found')) {
+        errorMessage = `Candy machine not found at address: ${candyMachineId}. Please verify the candy machine ID is correct and deployed on ${SOLANA_CONFIG.NETWORK}.`;
+      } else if (err.message?.includes('Invalid public key')) {
+        errorMessage = 'Invalid candy machine ID format. Please check the candy machine ID.';
+      } else if (err.message?.includes('network')) {
+        errorMessage = `Network error. Please check your connection to ${SOLANA_CONFIG.NETWORK}.`;
+      } else {
+        errorMessage = `Error: ${err.message || 'Unknown error occurred'}`;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [metaplex, candyMachineId]);
+  }, [metaplex, candyMachineId, connection]);
 
   useEffect(() => {
     if (metaplex) {
@@ -152,6 +186,20 @@ export default function NFTMintingInterface({
             <WalletMultiButton className="!bg-purple-600 hover:!bg-purple-700" />
           </div>
         </div>
+
+        {/* Debug Info - Remove in production */}
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardHeader>
+            <CardTitle className="text-yellow-800">Debug Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div><strong>Network:</strong> {SOLANA_CONFIG.NETWORK}</div>
+            <div><strong>RPC Endpoint:</strong> {connection.rpcEndpoint}</div>
+            <div><strong>Candy Machine ID:</strong> {candyMachineId}</div>
+            <div><strong>Wallet Connected:</strong> {publicKey ? 'Yes' : 'No'}</div>
+            {publicKey && <div><strong>Wallet Address:</strong> {publicKey.toString()}</div>}
+          </CardContent>
+        </Card>
 
         {/* Candy Machine Info */}
         {candyMachineData && (
