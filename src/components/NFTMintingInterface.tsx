@@ -19,7 +19,7 @@ interface NFTMintingInterfaceProps {
 interface CandyMachineData {
   address: PublicKey;
   itemsAvailable: number;
-  itemsRedeemed: number;
+  itemsMinted: number;
   itemsRemaining: number;
   goLiveDate?: Date;
   price: number;
@@ -70,11 +70,17 @@ export default function NFTMintingInterface({
       });
 
       setCandyMachine(candyMachineAccount);
+      
+      // Calculate minted items from available and remaining
+      const itemsAvailable = candyMachineAccount.itemsAvailable.toNumber();
+      const itemsRemaining = candyMachineAccount.itemsRemaining.toNumber();
+      const itemsMinted = itemsAvailable - itemsRemaining;
+      
       setCandyMachineData({
         address: candyMachineAccount.address,
-        itemsAvailable: candyMachineAccount.itemsAvailable.toNumber(),
-        itemsRedeemed: candyMachineAccount.itemsRedeemed.toNumber(),
-        itemsRemaining: candyMachineAccount.itemsRemaining.toNumber(),
+        itemsAvailable,
+        itemsMinted,
+        itemsRemaining,
         goLiveDate: candyMachineAccount.goLiveDate?.toDate(),
         price: candyMachineAccount.price.basisPoints.toNumber() / 1000000000, // Convert lamports to SOL
         symbol: candyMachineAccount.symbol,
@@ -170,7 +176,7 @@ export default function NFTMintingInterface({
                 </div>
                 <div className="text-center p-4 bg-gray-50 rounded-lg">
                   <div className="text-2xl font-bold text-green-600">
-                    {candyMachineData.itemsRedeemed}
+                    {candyMachineData.itemsMinted}
                   </div>
                   <div className="text-sm text-gray-600">Minted</div>
                 </div>
