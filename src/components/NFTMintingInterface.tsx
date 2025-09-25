@@ -1,16 +1,14 @@
-'use client';
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { PublicKey, Transaction } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import { Metaplex, walletAdapterIdentity, CandyMachineV2 } from '@metaplex-foundation/js';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Wallet, Image as ImageIcon, ExternalLink } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { SOLANA_CONFIG } from '@/lib/solana-config';
+import { Loader2, Wallet, Coins, Image as ImageIcon, ExternalLink } from 'lucide-react';
+import { SOLANA_CONFIG, getRPCEndpoint } from '@/lib/solana-config';
 
 interface NFTMintingInterfaceProps {
   candyMachineId?: string;
@@ -74,7 +72,7 @@ export default function NFTMintingInterface({
       const candyMachineAddress = new PublicKey(candyMachineId);
       console.log('Candy machine address:', candyMachineAddress.toString());
       
-      // First, let's try to check if the account exists
+      // First, let's try to check if the account exists and get raw data
       const accountInfo = await connection.getAccountInfo(candyMachineAddress);
       console.log('Account info:', accountInfo);
       
@@ -82,34 +80,59 @@ export default function NFTMintingInterface({
         throw new Error(`Candy machine account not found at address: ${candyMachineAddress.toString()}`);
       }
 
+      // Check the account owner to determine the candy machine type
+      const accountOwner = accountInfo.owner.toString();
+      console.log('Account owner:', accountOwner);
+      
+      // Known program IDs
+      const CANDY_MACHINE_V2_PROGRAM = 'cndy3Z4yapfJBmL3ShUp5exZKqR3z33thTzeNMm2gRZ';
+      const CANDY_MACHINE_CORE_PROGRAM = 'CndyV3LdqHUfDLmE5naZjVN8rBZz4tqhdefbAnjHG3JR';
+      
       let candyMachineAccount;
       let isV3 = false;
 
-      // Try Candy Machine Core (v3) first since the error suggests it's v3
-      try {
-        console.log('Trying Candy Machine Core (v3) first...');
-        candyMachineAccount = await metaplex.candyMachines().findByAddress({
-          address: candyMachineAddress,
-        });
-        isV3 = true;
-        console.log('Successfully loaded as Candy Machine Core (v3)');
-      } catch (v3Error) {
-        console.log('v3 failed, trying Candy Machine v2...');
+      if (accountOwner === CANDY_MACHINE_CORE_PROGRAM) {
+        console.log('Detected Candy Machine Core (v3) based on program ID');
         try {
-          // Try Candy Machine v2 as fallback
+          candyMachineAccount = await metaplex.candyMachines().findByAddress({
+            address: candyMachineAddress,
+          });
+          isV3 = true;
+          console.log('Successfully loaded as Candy Machine Core (v3)');
+        } catch (v3Error) {
+          console.error('Failed to load as Candy Machine Core:', v3Error);
+          throw new Error(`This is a Candy Machine Core account but failed to parse: ${v3Error.message}`);
+        }
+      } else if (accountOwner === CANDY_MACHINE_V2_PROGRAM) {
+        console.log('Detected Candy Machine v2 based on program ID');
+        try {
           candyMachineAccount = await metaplex.candyMachinesV2().findByAddress({
             address: candyMachineAddress,
           });
           console.log('Successfully loaded as Candy Machine v2');
         } catch (v2Error) {
-          console.error('Both v3 and v2 failed:', { v3Error, v2Error });
-          
-          // More specific error handling
-          if (v3Error.message?.includes('not of the expected type')) {
-            throw new Error(`This appears to be a Candy Machine Core account but there's an issue with the account structure. The account contains collection data but may be corrupted or use an unsupported format.`);
+          console.error('Failed to load as Candy Machine v2:', v2Error);
+          throw new Error(`This is a Candy Machine v2 account but failed to parse: ${v2Error.message}`);
+        }
+      } else {
+        // Unknown program, try both
+        console.log('Unknown program owner, trying both v3 and v2...');
+        try {
+          candyMachineAccount = await metaplex.candyMachines().findByAddress({
+            address: candyMachineAddress,
+          });
+          isV3 = true;
+          console.log('Successfully loaded as Candy Machine Core (v3)');
+        } catch (v3Error) {
+          try {
+            candyMachineAccount = await metaplex.candyMachinesV2().findByAddress({
+              address: candyMachineAddress,
+            });
+            console.log('Successfully loaded as Candy Machine v2');
+          } catch (v2Error) {
+            console.error('Both v3 and v2 failed:', { v3Error, v2Error });
+            throw new Error(`Account owner: ${accountOwner}. This account is not a recognized Candy Machine type. Please verify the candy machine ID.`);
           }
-          
-          throw new Error(`This account is not a valid Candy Machine v2 or Core. Please verify the candy machine ID.`);
         }
       }
 
@@ -166,9 +189,11 @@ export default function NFTMintingInterface({
         errorMessage = `Candy machine account not found at address: ${candyMachineId}. Please verify the candy machine ID is correct and deployed on ${SOLANA_CONFIG.NETWORK}.`;
       } else if (err.message?.includes('Invalid public key')) {
         errorMessage = 'Invalid candy machine ID format. Please check the candy machine ID.';
+      } else if (err.message?.includes('Account owner:')) {
+        errorMessage = err.message;
       } else if (err.message?.includes('Candy Machine Core account')) {
         errorMessage = err.message;
-      } else if (err.message?.includes('not a valid Candy Machine')) {
+      } else if (err.message?.includes('Candy Machine v2 account')) {
         errorMessage = err.message;
       } else if (err.message?.includes('network')) {
         errorMessage = `Network error. Please check your connection to ${SOLANA_CONFIG.NETWORK}.`;
