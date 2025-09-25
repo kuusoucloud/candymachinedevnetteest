@@ -35,15 +35,15 @@ interface MintedNFT {
   signature: string;
 }
 
-export default function NFTMintingInterface({ 
-  candyMachineId = SOLANA_CONFIG.CANDY_MACHINE_ID 
+export default function NFTMintingInterface({
+  candyMachineId: initialCandyMachineId = SOLANA_CONFIG.CANDY_MACHINE_ID
 }: NFTMintingInterfaceProps) {
   const { connection } = useConnection();
   const { publicKey, wallet, signTransaction } = useWallet();
   const [metaplex, setMetaplex] = useState<Metaplex | null>(null);
   const [candyMachine, setCandyMachine] = useState<CandyMachineV2 | null>(null);
   const [candyMachineData, setCandyMachineData] = useState<CandyMachineData | null>(null);
-  const [candyMachineId, setCandyMachineId] = useState(SOLANA_CONFIG.CANDY_MACHINE_ID);
+  const [candyMachineId, setCandyMachineId] = useState(initialCandyMachineId);
   const [testCandyMachineId, setTestCandyMachineId] = useState('');
   const [loading, setLoading] = useState(false);
   const [minting, setMinting] = useState(false);
@@ -85,25 +85,31 @@ export default function NFTMintingInterface({
       let candyMachineAccount;
       let isV3 = false;
 
+      // Try Candy Machine Core (v3) first since the error suggests it's v3
       try {
-        // Try Candy Machine v2 first
-        console.log('Trying Candy Machine v2...');
-        candyMachineAccount = await metaplex.candyMachinesV2().findByAddress({
+        console.log('Trying Candy Machine Core (v3) first...');
+        candyMachineAccount = await metaplex.candyMachines().findByAddress({
           address: candyMachineAddress,
         });
-        console.log('Successfully loaded as Candy Machine v2');
-      } catch (v2Error) {
-        console.log('v2 failed, trying Candy Machine Core (v3)...');
+        isV3 = true;
+        console.log('Successfully loaded as Candy Machine Core (v3)');
+      } catch (v3Error) {
+        console.log('v3 failed, trying Candy Machine v2...');
         try {
-          // Try Candy Machine Core (v3)
-          candyMachineAccount = await metaplex.candyMachines().findByAddress({
+          // Try Candy Machine v2 as fallback
+          candyMachineAccount = await metaplex.candyMachinesV2().findByAddress({
             address: candyMachineAddress,
           });
-          isV3 = true;
-          console.log('Successfully loaded as Candy Machine Core (v3)');
-        } catch (v3Error) {
-          console.error('Both v2 and v3 failed:', { v2Error, v3Error });
-          throw new Error(`This account is not a valid Candy Machine v2 or v3. Please verify the candy machine ID.`);
+          console.log('Successfully loaded as Candy Machine v2');
+        } catch (v2Error) {
+          console.error('Both v3 and v2 failed:', { v3Error, v2Error });
+          
+          // More specific error handling
+          if (v3Error.message?.includes('not of the expected type')) {
+            throw new Error(`This appears to be a Candy Machine Core account but there's an issue with the account structure. The account contains collection data but may be corrupted or use an unsupported format.`);
+          }
+          
+          throw new Error(`This account is not a valid Candy Machine v2 or Core. Please verify the candy machine ID.`);
         }
       }
 
@@ -160,6 +166,8 @@ export default function NFTMintingInterface({
         errorMessage = `Candy machine account not found at address: ${candyMachineId}. Please verify the candy machine ID is correct and deployed on ${SOLANA_CONFIG.NETWORK}.`;
       } else if (err.message?.includes('Invalid public key')) {
         errorMessage = 'Invalid candy machine ID format. Please check the candy machine ID.';
+      } else if (err.message?.includes('Candy Machine Core account')) {
+        errorMessage = err.message;
       } else if (err.message?.includes('not a valid Candy Machine')) {
         errorMessage = err.message;
       } else if (err.message?.includes('network')) {
