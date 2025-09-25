@@ -42,11 +42,13 @@ export default function NFTMintingInterface({
   const [metaplex, setMetaplex] = useState<Metaplex | null>(null);
   const [candyMachine, setCandyMachine] = useState<CandyMachineV2 | null>(null);
   const [candyMachineData, setCandyMachineData] = useState<CandyMachineData | null>(null);
+  const [candyMachineId, setCandyMachineId] = useState(SOLANA_CONFIG.CANDY_MACHINE_ID);
+  const [testCandyMachineId, setTestCandyMachineId] = useState('');
   const [loading, setLoading] = useState(false);
   const [minting, setMinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mintedNFTs, setMintedNFTs] = useState<MintedNFT[]>([]);
   const [success, setSuccess] = useState<string | null>(null);
+  const [mintedNFTs, setMintedNFTs] = useState<MintedNFT[]>([]);
 
   // Initialize Metaplex
   useEffect(() => {
@@ -116,6 +118,8 @@ export default function NFTMintingInterface({
         errorMessage = `Candy machine not found at address: ${candyMachineId}. Please verify the candy machine ID is correct and deployed on ${SOLANA_CONFIG.NETWORK}.`;
       } else if (err.message?.includes('Invalid public key')) {
         errorMessage = 'Invalid candy machine ID format. Please check the candy machine ID.';
+      } else if (err.message?.includes('not of the expected type')) {
+        errorMessage = `The account at ${candyMachineId} exists but is not a valid Candy Machine v2. Please verify you're using the correct candy machine ID for a deployed candy machine on ${SOLANA_CONFIG.NETWORK}.`;
       } else if (err.message?.includes('network')) {
         errorMessage = `Network error. Please check your connection to ${SOLANA_CONFIG.NETWORK}.`;
       } else {
@@ -198,6 +202,45 @@ export default function NFTMintingInterface({
             <div><strong>Candy Machine ID:</strong> {candyMachineId}</div>
             <div><strong>Wallet Connected:</strong> {publicKey ? 'Yes' : 'No'}</div>
             {publicKey && <div><strong>Wallet Address:</strong> {publicKey.toString()}</div>}
+          </CardContent>
+        </Card>
+
+        {/* Candy Machine ID Input for Testing */}
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="text-blue-800">Test Different Candy Machine</CardTitle>
+            <CardDescription>
+              The current candy machine ID appears to be invalid. Try a different one:
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Enter candy machine ID"
+                className="flex-1 px-3 py-2 border rounded-md"
+                value={testCandyMachineId}
+                onChange={(e) => setTestCandyMachineId(e.target.value)}
+              />
+              <Button 
+                onClick={() => {
+                  if (testCandyMachineId.trim()) {
+                    // Update the candy machine ID temporarily
+                    setCandyMachineId(testCandyMachineId.trim());
+                  }
+                }}
+                disabled={!testCandyMachineId.trim()}
+              >
+                Test
+              </Button>
+            </div>
+            <div className="text-xs text-blue-600">
+              <p><strong>Suggested test candy machine IDs for devnet:</strong></p>
+              <ul className="list-disc list-inside mt-1 space-y-1">
+                <li>Try creating your own candy machine using Metaplex Sugar CLI</li>
+                <li>Or find a valid devnet candy machine from Solana Explorer</li>
+              </ul>
+            </div>
           </CardContent>
         </Card>
 
