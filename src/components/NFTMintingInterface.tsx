@@ -114,7 +114,6 @@ export default function NFTMintingInterface({
     try {
       const { nft, response } = await metaplex.candyMachinesV2().mint({
         candyMachine,
-        owner: publicKey,
       });
 
       const mintedNFT: MintedNFT = {
