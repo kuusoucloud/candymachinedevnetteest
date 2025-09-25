@@ -25,6 +25,7 @@ interface CandyMachineData {
   price: number;
   symbol: string;
   sellerFeeBasisPoints: number;
+  version?: 'v2' | 'v3';
 }
 
 interface MintedNFT {
@@ -81,29 +82,70 @@ export default function NFTMintingInterface({
         throw new Error(`Candy machine account not found at address: ${candyMachineAddress.toString()}`);
       }
 
-      const candyMachineAccount = await metaplex.candyMachinesV2().findByAddress({
-        address: candyMachineAddress,
-      });
+      let candyMachineAccount;
+      let isV3 = false;
+
+      try {
+        // Try Candy Machine v2 first
+        console.log('Trying Candy Machine v2...');
+        candyMachineAccount = await metaplex.candyMachinesV2().findByAddress({
+          address: candyMachineAddress,
+        });
+        console.log('Successfully loaded as Candy Machine v2');
+      } catch (v2Error) {
+        console.log('v2 failed, trying Candy Machine Core (v3)...');
+        try {
+          // Try Candy Machine Core (v3)
+          candyMachineAccount = await metaplex.candyMachines().findByAddress({
+            address: candyMachineAddress,
+          });
+          isV3 = true;
+          console.log('Successfully loaded as Candy Machine Core (v3)');
+        } catch (v3Error) {
+          console.error('Both v2 and v3 failed:', { v2Error, v3Error });
+          throw new Error(`This account is not a valid Candy Machine v2 or v3. Please verify the candy machine ID.`);
+        }
+      }
 
       console.log('Candy machine account:', candyMachineAccount);
-
       setCandyMachine(candyMachineAccount);
       
-      // Calculate minted items from available and remaining
-      const itemsAvailable = candyMachineAccount.itemsAvailable.toNumber();
-      const itemsRemaining = candyMachineAccount.itemsRemaining.toNumber();
-      const itemsMinted = itemsAvailable - itemsRemaining;
-      
-      setCandyMachineData({
-        address: candyMachineAccount.address,
-        itemsAvailable,
-        itemsMinted,
-        itemsRemaining,
-        goLiveDate: candyMachineAccount.goLiveDate?.toDate(),
-        price: candyMachineAccount.price.basisPoints.toNumber() / 1000000000, // Convert lamports to SOL
-        symbol: candyMachineAccount.symbol,
-        sellerFeeBasisPoints: candyMachineAccount.sellerFeeBasisPoints,
-      });
+      // Handle different versions
+      if (isV3) {
+        // Candy Machine Core (v3) structure
+        const itemsLoaded = candyMachineAccount.itemsLoaded?.toNumber() || 0;
+        const itemsRedeemed = candyMachineAccount.itemsRedeemed?.toNumber() || 0;
+        const itemsRemaining = itemsLoaded - itemsRedeemed;
+        
+        setCandyMachineData({
+          address: candyMachineAccount.address,
+          itemsAvailable: itemsLoaded,
+          itemsMinted: itemsRedeemed,
+          itemsRemaining: itemsRemaining,
+          goLiveDate: null, // v3 doesn't have goLiveDate in the same way
+          price: 0, // v3 pricing is handled differently
+          symbol: candyMachineAccount.symbol || 'NFT',
+          sellerFeeBasisPoints: candyMachineAccount.sellerFeeBasisPoints || 0,
+          version: 'v3'
+        });
+      } else {
+        // Candy Machine v2 structure
+        const itemsAvailable = candyMachineAccount.itemsAvailable.toNumber();
+        const itemsRemaining = candyMachineAccount.itemsRemaining.toNumber();
+        const itemsMinted = itemsAvailable - itemsRemaining;
+        
+        setCandyMachineData({
+          address: candyMachineAccount.address,
+          itemsAvailable,
+          itemsMinted,
+          itemsRemaining,
+          goLiveDate: candyMachineAccount.goLiveDate?.toDate(),
+          price: candyMachineAccount.price.basisPoints.toNumber() / 1000000000, // Convert lamports to SOL
+          symbol: candyMachineAccount.symbol,
+          sellerFeeBasisPoints: candyMachineAccount.sellerFeeBasisPoints,
+          version: 'v2'
+        });
+      }
     } catch (err: any) {
       console.error('Error fetching candy machine:', err);
       console.error('Error details:', {
@@ -115,11 +157,11 @@ export default function NFTMintingInterface({
       let errorMessage = 'Failed to fetch candy machine data.';
       
       if (err.message?.includes('not found')) {
-        errorMessage = `Candy machine not found at address: ${candyMachineId}. Please verify the candy machine ID is correct and deployed on ${SOLANA_CONFIG.NETWORK}.`;
+        errorMessage = `Candy machine account not found at address: ${candyMachineId}. Please verify the candy machine ID is correct and deployed on ${SOLANA_CONFIG.NETWORK}.`;
       } else if (err.message?.includes('Invalid public key')) {
         errorMessage = 'Invalid candy machine ID format. Please check the candy machine ID.';
-      } else if (err.message?.includes('not of the expected type')) {
-        errorMessage = `The account at ${candyMachineId} exists but is not a valid Candy Machine v2. Please verify you're using the correct candy machine ID for a deployed candy machine on ${SOLANA_CONFIG.NETWORK}.`;
+      } else if (err.message?.includes('not a valid Candy Machine')) {
+        errorMessage = err.message;
       } else if (err.message?.includes('network')) {
         errorMessage = `Network error. Please check your connection to ${SOLANA_CONFIG.NETWORK}.`;
       } else {
@@ -150,9 +192,25 @@ export default function NFTMintingInterface({
     setSuccess(null);
 
     try {
-      const { nft, response } = await metaplex.candyMachinesV2().mint({
-        candyMachine,
-      });
+      let nft, response;
+      
+      if (candyMachineData?.version === 'v3') {
+        // Candy Machine Core (v3) minting
+        console.log('Minting with Candy Machine Core (v3)...');
+        const result = await metaplex.candyMachines().mint({
+          candyMachine,
+        });
+        nft = result.nft;
+        response = result.response;
+      } else {
+        // Candy Machine v2 minting
+        console.log('Minting with Candy Machine v2...');
+        const result = await metaplex.candyMachinesV2().mint({
+          candyMachine,
+        });
+        nft = result.nft;
+        response = result.response;
+      }
 
       const mintedNFT: MintedNFT = {
         name: nft.name,
@@ -200,6 +258,7 @@ export default function NFTMintingInterface({
             <div><strong>Network:</strong> {SOLANA_CONFIG.NETWORK}</div>
             <div><strong>RPC Endpoint:</strong> {connection.rpcEndpoint}</div>
             <div><strong>Candy Machine ID:</strong> {candyMachineId}</div>
+            <div><strong>Candy Machine Version:</strong> {candyMachineData?.version || 'Unknown'}</div>
             <div><strong>Wallet Connected:</strong> {publicKey ? 'Yes' : 'No'}</div>
             {publicKey && <div><strong>Wallet Address:</strong> {publicKey.toString()}</div>}
           </CardContent>
