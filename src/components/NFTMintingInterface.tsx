@@ -147,6 +147,11 @@ export default function NFTMintingInterface({
   }, [connection, candyMachineId]);
 
   useEffect(() => {
+    // Fetch candy machine data when component mounts or candyMachineId changes
+    fetchCandyMachineData();
+  }, [fetchCandyMachineData]);
+
+  useEffect(() => {
     if (metaplex) {
       fetchCandyMachineData();
     }
